@@ -1,0 +1,17 @@
+[
+ {
+  "country": "US",
+  "container_id": "E9A06273-6B6A-4710-9A38-86EAD6EE0384",
+  "product_type": "doc",
+  "app_id": null,
+  "os": null,
+  "scenario": "Mrz",
+  "product_version": "1",
+  "api_version": null,
+  "core_version": null,
+  "core_mode": null,
+  "tag": null,
+  "session_count": 1,
+  "transactions_per_session": 2
+}
+]
