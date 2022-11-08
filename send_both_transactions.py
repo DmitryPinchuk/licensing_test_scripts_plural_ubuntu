@@ -4,6 +4,7 @@ import os
 import uuid
 import time
 from ctypes import CDLL
+from datetime import datetime
 
 import requests
 import urllib3
@@ -22,8 +23,36 @@ dll_path = "./libSecure.so"
 lic_crypto = LicCryptoLib(CDLL(dll_path), FsKeysStore())
 
 
-def send_transaction(session_id, container_id, scenario, product_id, app_id, os, product_version, api_version,
-                     core_version, core_mode, tag):
+def license_consumptions_recalculation(current_container_id):
+    os.system('aws sns publish --topic-arn arn:aws:sns:eu-central-1:823608345502:v1portal-test-bg-jobs-sns-euc1 '
+              '--message \'{ "job_type": "UpdateLicenseConsumptionsJob", "data": {"container_id": "' + current_container_id + '"}}\'')
+
+
+def daily_aggregation():
+    lambda_response = os.popen(
+        "aws lambda invoke --function-name v2license-test-aggregation-daily-lambda-euc1 --payload '{}' response.json").read()
+    return json.loads(lambda_response)["StatusCode"]
+
+
+def dashboard_calculation():
+    date_now_full = datetime.now().timetuple()
+    year = date_now_full.tm_year
+    date_now = {
+        'year': '1',
+        'month': date_now_full.tm_mon,
+        'day': date_now_full.tm_yday
+    }
+
+    for i in range(3):
+        period_type = (list(date_now.keys())[i])
+        period_number = (list(date_now.values())[i])
+
+        os.system('aws sns publish --topic-arn arn:aws:sns:eu-central-1:823608345502:v1portal-dev-bg-jobs-sns-euc1 '
+                  '--message \'{ "job_type": "DashboardReportCalculationJob", "data": {"period_type": "' + str(
+            period_type) + '", "year": ' + str(year) + ', "period_number": ' + str(period_number) + '}}\'')
+
+
+def send_transaction(session_id):
     lic_request = {
         'container_id': container_id,
         'session_id': session_id,
@@ -31,7 +60,7 @@ def send_transaction(session_id, container_id, scenario, product_id, app_id, os,
         "processParam": {"scenario": scenario},
         "product_id": product_id,
         "appId": app_id,
-        "os": os,
+        "os": os_var,
         "product_version": product_version,
         "apiVersion": api_version,
         "coreVersion": core_version,
@@ -44,8 +73,7 @@ def send_transaction(session_id, container_id, scenario, product_id, app_id, os,
     return requests.post(f"{host}/validate", json=enc_lic_request, verify=False)
 
 
-def register_session(container_id, scenario, product_id, app_id, os, product_version, api_version, core_version,
-                     core_mode, tag):
+def register_session():
     session_id = uuid.uuid1().hex
     session_request = {
         'container_id': container_id,
@@ -53,7 +81,7 @@ def register_session(container_id, scenario, product_id, app_id, os, product_ver
         "processParam": {"scenario": scenario},
         "product_id": product_id,
         "appId": app_id,
-        "os": os,
+        "os": os_var,
         "product_version": product_version,
         "apiVersion": api_version,
         "coreVersion": core_version,
@@ -71,7 +99,7 @@ def register_session(container_id, scenario, product_id, app_id, os, product_ver
         time.sleep(1)
 
 
-def vpn(country):
+def vpn():
     if country:
         vpn_output = os.popen(f'windscribe connect {country}').read()
 
@@ -88,15 +116,13 @@ def vpn(country):
             print("\nSomething went wrong. VPN has not been disconnected\n")
 
 
-def offline_run(country, container_id, scenario, app_id, os, product_type, product_version, api_version,
-                core_version, core_mode, tag, session_count, transactions_per_session, product_id, requests_count,
-                user_id):
-    # vpn(country)
+def offline_run():
+    vpn()
 
     print(f'Country: {country}\n'
           f'Container ID: {container_id} \n'
           f'App ID: {app_id} \n'
-          f'OS: {os} \n'
+          f'OS: {os_var} \n'
           f'Product Version: {product_version} \n'
           f'Api Version: {api_version} \n'
           f'Core Version: {core_version} \n'
@@ -116,7 +142,7 @@ def offline_run(country, container_id, scenario, app_id, os, product_type, produ
         params = {
             "userId": user_id if user_id else f"{uuid.uuid4()}",
             "appId": app_id,
-            "os": os,
+            "os": os_var,
             "product_version": product_version,
             "apiVersion": api_version,
             "coreVersion": core_version,
@@ -135,16 +161,14 @@ def offline_run(country, container_id, scenario, app_id, os, product_type, produ
     return container_id
 
 
-def online_run(country, container_id, scenario, app_id, os, product_type, product_version, api_version,
-               core_version, core_mode, tag, session_count, transactions_per_session, product_id, requests_count,
-               user_id):
-    # vpn(country)
+def online_run():
+    vpn()
 
     print(f'Country: {country}\n'
           f'Container ID: {container_id}\n'
           f'Scenario: {scenario} \n'
           f'App ID: {app_id} \n'
-          f'OS: {os}\n'
+          f'OS: {os_var}\n'
           f'Product Type: {product_type} \n'
           f'Product Version: {product_version} \n'
           f'Api Version: {api_version} \n'
@@ -160,16 +184,14 @@ def online_run(country, container_id, scenario, app_id, os, product_type, produc
     for session in range(session_count):
         sessions_sum_200_transactions.append(0)
 
-        session_id = register_session(container_id, scenario, product_id, app_id, os, product_version, api_version,
-                                      core_version, core_mode, tag)
+        session_id = register_session()
         if session_id:
             sessions_200 += 1
             for transaction in range(transactions_per_session):
                 print(
                     f"Session: {session + 1}/{session_count}. Transaction {transaction + 1}/{transactions_per_session}")
 
-                response = send_transaction(session_id, container_id, scenario, product_id, app_id, os,
-                                            product_version, api_version, core_version, core_mode, tag)
+                response = send_transaction(session_id)
 
                 if response.status_code in (200, 406):
                     sessions_sum_200_transactions[session] += 1
@@ -181,18 +203,16 @@ def online_run(country, container_id, scenario, app_id, os, product_type, produc
 
 
 def get_variables(config):
-    global country, container_id, scenario, app_id, os, product_type, product_version, api_version, core_version, core_mode, tag, session_count, transactions_per_session, product_id, requests_count, user_id
+    global country, container_id, scenario, app_id, os_var, product_type, product_version, api_version, core_version, core_mode, tag, session_count, transactions_per_session, product_id, requests_count, user_id
 
     if not config:
         return
 
     country = config.get("country")
-    vpn(country)
-
     container_id = config.get("container_id")
     scenario = config.get("scenario")
     app_id = config.get("app_id")
-    os = config.get("os")
+    os_var = config.get("os")
     product_type = config.get("product_type")
     product_id = products_types.get(config.get("product_type"))
     product_version = config.get("product_version")
@@ -227,17 +247,22 @@ def run(transaction_type, run_function):
 
     for i in range(len(config)):
         get_variables(config[i])
-        container_id_all.append(
-            run_function(country, container_id, scenario, app_id, os, product_type, product_version, api_version,
-                         core_version, core_mode, tag, session_count, transactions_per_session, product_id,
-                         requests_count, user_id))
+        container_id_all.append(run_function())
 
 
 def main():
     global container_id_all
     container_id_all = []
-    # run("online", online_run)
+    run("online", online_run)
     run("offline", offline_run)
+
+    if daily_aggregation() == 200:
+        for i in range(len(container_id_all)):
+            license_consumptions_recalculation(container_id_all[i])
+    else:
+        print("Something went wrong with Daily Aggregation")
+
+    dashboard_calculation()
 
 
 if __name__ == "__main__":

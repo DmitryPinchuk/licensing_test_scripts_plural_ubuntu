@@ -1,6 +1,6 @@
 [
  {
-  "country": "US",
+  "country": "CA",
   "container_id": "E9A06273-6B6A-4710-9A38-86EAD6EE0384",
   "product_type": "doc",
   "app_id": null,
@@ -15,7 +15,7 @@
   "transactions_per_session": 2
 },
   {
-  "country": "US",
+  "country": null,
   "container_id": "E9A06273-6B6A-4710-9A38-86EAD6EE0384",
   "product_type": "doc",
   "app_id": null,
