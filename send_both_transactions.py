@@ -30,7 +30,7 @@ def license_consumptions_recalculation(current_container_id):
 
 def daily_aggregation():
     lambda_response = os.popen(
-        "aws lambda invoke --function-name v2license-test-aggregation-daily-lambda-euc1 --payload '{}' response.json").read()
+        "aws lambda invoke --cli-read-timeout 0 --function-name v2license-test-aggregation-daily-lambda-euc1 --payload '{}' response.json").read()
     return json.loads(lambda_response)["StatusCode"]
 
 
